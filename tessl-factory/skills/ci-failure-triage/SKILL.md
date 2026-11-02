@@ -1,13 +1,13 @@
 ---
 name: ci-failure-triage
-description: Read a failed CI check on the carnival's main branch, work out what broke and which change broke it, and file one GitHub issue that explains it. Use when the CI failure triage loop runs after `ci-check` fails on `main`, or when asked why CI is red on `main`. Files issues only; never changes code, labels or anything else.
+description: Read a failed CI check on the carnival's main branch, work out what broke and which change broke it, trace the root cause with five whys (how the change reached `main` and why nothing stopped it), and file one GitHub issue that explains it. Use when the CI failure triage loop runs after `ci-check` fails on `main`, or when asked why CI is red on `main`. Files issues only; never changes code, labels or anything else.
 ---
 
 # CI failure triage
 
 When CI fails on `main`, everyone who branches from it inherits the failure.
-Your job is to explain the failure in one issue so a person can decide who
-fixes it. Don't fix anything yourself: the factory ships the fixes.
+Your job is to explain the failure, and the gaps that let it reach `main`, in
+one issue so a person can decide who fixes it. Don't fix anything yourself: the factory ships the fixes.
 
 ## Staying safe
 
@@ -50,6 +50,40 @@ loop runs with GitHub write access.
    the pull request that merged the commit. If the failure started earlier,
    walk back through `git log` on `main` and the earlier runs until you find
    the first commit that failed.
+5. **Ask why five times.** Start from the failure and ask "why?" until you
+   reach a cause a person can fix, up to five times. Each answer must cite
+   evidence you read: a log line, a commit, a pull request or an API response.
+   Stop the chain early when the next "why" has no evidence. Don't speculate.
+   Every check here is a read. The whys should cover, where they apply:
+   - **The code:** what the change did that broke the check.
+   - **How it reached `main`:** a direct push or a merged pull request.
+     `gh api repos/{owner}/{repo}/commits/<sha>/pulls` lists the pull requests
+     that contain the commit; an empty list means a direct push. For a pull
+     request, read whether its checks passed before it merged, whether
+     `ci-check` was skipped or red, and whether it was reviewed, with
+     `gh pr view <number> --json reviews,statusCheckRollup,mergedBy`.
+   - **Why the guardrails didn't stop it:** `main` can be guarded by classic
+     branch protection, by rulesets, or both, and each has its own read:
+     - `gh api repos/{owner}/{repo}/rules/branches/main` lists the ruleset
+       rules that apply to `main`. Each rule's `type` says what it requires,
+       such as `pull_request` (with its required approving reviews) or
+       `required_status_checks` (with the checks it names, such as
+       `ci-check`).
+     - `gh api repos/{owner}/{repo}/branches/main/protection` reads classic
+       branch protection. A 404 whose message is "Branch not protected" means
+       only that there is no classic protection. It says nothing about
+       rulesets.
+     - `gh api repos/{owner}/{repo}/branches/main --jq .protected` is a
+       summary, not a substitute for the two reads above.
+     - Conclude `main` is unprotected only when classic protection is absent
+       **and** `rules/branches/main` is empty (`[]`). When a ruleset applies,
+       report what it requires instead: whether pull requests are required,
+       which status checks are required and whether `ci-check` is one, and
+       whether reviews are required.
+     - A 403 from either read, or a 404 from `branches/main/protection` with
+       any other message, means you can't read it: say that and never guess.
+   - **Why the tests didn't catch it earlier:** for example, a test that only
+     runs on `main`, or a coverage floor that let a drop through.
 
 ## What to file
 
@@ -68,10 +102,63 @@ loop runs with GitHub write access.
     decide whether any of them describes the same underlying failure.
 - **One issue per failure.** Never file more than one issue in a run.
 - **Title:** `CI failing on main: <short cause>`.
-- **Body:** link `CHECK_RUN_URL` and the commit, then give the evidence:
-  quoted log lines and file paths, for example `src/carnival/scores.ts:12`.
-  Name the commit or merged pull request you suspect, and why. End with a
-  "Done when" whose last item is `npm run check` passing on `main`.
+- **Body:** fill in this template, in this order. Replace `CHECK_RUN_URL` and
+  every `<placeholder>`, and add or drop list items to fit what you found:
+
+  ```markdown
+  [Failed check run](CHECK_RUN_URL) on commit [<short sha>](<commit url>).
+
+  ## Evidence
+
+  - Failing step: <the step from "Name the step">
+  - Files: <file path>:<line>
+
+  > <quoted log line>
+
+  ## Suspected change
+
+  <the commit or merged pull request you suspect, and why>
+
+  ## Root cause: five whys
+
+  1. <why> (<evidence>)
+  2. Because <why> (<evidence>)
+  3. Because <why> (<evidence>)
+  4. Because <why> (<evidence>)
+  5. Because <why> (<evidence>)
+
+  ## Prevent it
+
+  - <systemic fix> (**factory, from an issue**)
+  - <systemic fix> (**repository admin, in GitHub settings**)
+  - <systemic fix>: covered by <link to the existing open issue>
+
+  ## Done when
+
+  - [ ] <a step that gets `main` green>
+  - [ ] `npm run check` passes on `main`.
+
+  Follow-ups, separate from fixing this failure:
+
+  - [ ] <a "Prevent it" item>
+  ```
+
+  - **Five whys:** one why per line, each ending with its evidence. Stop the
+    list early when the next why has no evidence.
+  - **Prevent it:** tag each item with who can make it. The **factory, from
+    an issue** can change code, tests, docs, the CI workflow, or a skill such
+    as `skills/set-up-your-fork`. A **repository admin, in GitHub settings**
+    changes branch protection, rulesets, required checks or reviews. The
+    factory can't change settings.
+  - **Done when:** the items get `main` green, and the last one is
+    `npm run check` passing on `main`. The "Prevent it" items follow as
+    unchecked follow-ups, marked as separate from fixing this failure.
+
+- **Process gaps stay in this issue.** Don't file issues of their own for
+  them. If an open issue already covers a process gap, link it under
+  "Prevent it" instead of repeating it. A new failure still gets its own
+  issue even when its root cause matches an earlier one: link the earlier
+  issue in the chain.
 - **No labels.** File the issue with no labels at all.
 - **Can't tell what failed?** Still file one issue: say what you read and what
   you couldn't work out.
