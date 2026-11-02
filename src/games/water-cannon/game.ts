@@ -76,6 +76,7 @@ export function fire(state: WaterCannonState, aimX: number, aimY: number): boole
     vx: (dx / length) * SHOT_SPEED,
     vy: (dy / length) * SHOT_SPEED,
   });
+  state.tank -= 1;
   return true;
 }
 
