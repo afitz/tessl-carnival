@@ -36,7 +36,7 @@ fork, not to everyone who forks this repository.
 | `npm ci`         | Install dependencies                                      |
 | `npm run dev`    | Run the carnival at localhost:5173                        |
 | `npm run format` | Format the repo with Prettier, skipping `.prettierignore` |
-| `npm run check`  | Lint, check formatting, type-check and test everything    |
+| `npm run check`  | Lint, check formatting, type-check, test and coverage     |
 | `npm run build`  | Build the site into `dist/`                               |
 
 Run `npm run check` before you finish any change. CI runs the same command.
@@ -127,6 +127,8 @@ You often work on an issue with nobody around to answer questions.
   `.tessl/` and `package-lock.json`.
 - **Don't add dependencies.** `npm ci` has to stay quick, and the cloud machine
   can't install system packages.
+- **Keep coverage up.** A change that lowers coverage below the thresholds in
+  `vite.config.ts` fails CI, so new logic needs tests.
 - **Before you finish,** run `npm run format`, then `npm run check`, and make
   sure every README you touched still matches the code.
 - **In the pull request,** say what changed and how to try it, and end with
