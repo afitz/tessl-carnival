@@ -11,7 +11,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts'],
       reporter: ['text-summary'],
-      // Today's coverage rounded down, so any drop fails `npm run test`.
+      // Fixed floors (today's coverage rounded down), not a no-drop rule:
+      // falling below a floor fails `npm run test`, but a drop that stays
+      // above it, such as less than a point today, still passes.
       thresholds: {
         statements: 23,
         branches: 29,
