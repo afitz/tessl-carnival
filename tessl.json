@@ -1,0 +1,33 @@
+{
+  "name": "tessl-carnival",
+  "actions": {
+    "ci-failure-triage": {
+      "skill": "file:tessl-factory#ci-failure-triage",
+      "environment": "tessl-carnival-loops",
+      "agent": "claude",
+      "model": "claude-sonnet-5-5",
+      "timeout": "30m"
+    }
+  },
+  "triggers": {
+    "ci-failed-on-main": {
+      "on": ["github:check_run.completed"],
+      "when": {
+        "event.check_run.name": "ci-check",
+        "event.check_run.check_suite.head_branch": "main",
+        "event.repository.id": 1443176253,
+        "event.check_run.conclusion": { "in": ["failure", "timed_out"] }
+      },
+      "concurrency": {
+        "keys": ["ci-failure-triage:{{ event.check_run.head_sha }}"]
+      },
+      "action": {
+        "use": "ci-failure-triage",
+        "inputs": {
+          "HEAD_SHA": "{{ event.check_run.head_sha }}",
+          "CHECK_RUN_URL": "{{ event.check_run.html_url }}"
+        }
+      }
+    }
+  }
+}

@@ -141,10 +141,14 @@ You often work on an issue with nobody around to answer questions.
   in a fork, lock it down, and deploy the carnival.
 - `skills/check-workshop-ready/SKILL.md`: check a laptop and fork are ready for
   the workshop. It only checks, and changes nothing without asking.
-- `tessl-factory/skills/`: sample skills for scheduled maintenance loops
-  (rule mining, doc gardening, test health). Each one files issues and never
-  changes code. `tessl-factory/` is a plugin, so a schedule in `tessl.json` runs
-  one as `file:tessl-factory#rule-mining`.
+- `tessl-factory/skills/`: sample skills for maintenance loops (rule mining,
+  doc gardening, test health, CI failure triage). Each one files issues and
+  never changes code. `tessl-factory/` is a plugin, so a schedule in
+  `tessl.json` runs one as `file:tessl-factory#rule-mining`.
+  - `tessl-factory/skills/ci-failure-triage/SKILL.md` runs when CI fails on
+    `main`: the `ci-failed-on-main` trigger in `tessl.json` starts it on a
+    failed `ci-check`, and it files one issue explaining the failure, with no
+    label.
 
 `WORKSHOP.md` starts the workshop this repo was built for, and sends people down
 one of two paths: `workshop/agent.md` or `workshop/browser.md`. Each has a core
