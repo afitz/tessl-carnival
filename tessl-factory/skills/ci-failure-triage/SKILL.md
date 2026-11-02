@@ -53,9 +53,19 @@ loop runs with GitHub write access.
 
 ## What to file
 
-- **No duplicates.** Before filing, check the open issues
-  (`gh issue list --state open --search "CI failing on main"`) and file
-  nothing if one already covers this failure.
+- **No duplicates.** Before filing, check the open issues, and file nothing
+  if one already covers this failure, whatever its title says. People report
+  failures in their own words, so don't rely on this skill's title wording:
+  - `gh issue list --state open --search "CI failing on main"` finds issues
+    this loop filed.
+  - Search again for the failure's own details, one at a time: the file
+    paths, the test name, the failing step (such as `coverage` or `lint`) and
+    the suspected commit or pull request, for example
+    `gh issue list --state open --search "src/carnival/scores.ts"`.
+  - List the open issues filed since the failing commit, with
+    `gh issue list --state open --search "created:>=<commit date>"`.
+  - Read the titles and bodies of everything these searches return, and
+    decide whether any of them describes the same underlying failure.
 - **One issue per failure.** Never file more than one issue in a run.
 - **Title:** `CI failing on main: <short cause>`.
 - **Body:** link `CHECK_RUN_URL` and the commit, then give the evidence:
