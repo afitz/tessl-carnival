@@ -62,15 +62,26 @@ loop runs with GitHub write access.
      request, read whether its checks passed before it merged, whether
      `ci-check` was skipped or red, and whether it was reviewed, with
      `gh pr view <number> --json reviews,statusCheckRollup,mergedBy`.
-   - **Why the guardrails didn't stop it:** read whether `main` is protected
-     and what rules apply, with
-     `gh api repos/{owner}/{repo}/branches/main --jq .protected` and
-     `gh api repos/{owner}/{repo}/rules/branches/main`. Then try
-     `gh api repos/{owner}/{repo}/branches/main/protection`. A 404 whose
-     message is "Branch not protected" means there is no protection; a 403,
-     or a 404 with any other message, means you can't read it, so say that
-     and never guess. Note whether pull requests are required, whether
-     `ci-check` is a required status check, and whether reviews are required.
+   - **Why the guardrails didn't stop it:** `main` can be guarded by classic
+     branch protection, by rulesets, or both, and each has its own read:
+     - `gh api repos/{owner}/{repo}/rules/branches/main` lists the ruleset
+       rules that apply to `main`. Each rule's `type` says what it requires,
+       such as `pull_request` (with its required approving reviews) or
+       `required_status_checks` (with the checks it names, such as
+       `ci-check`).
+     - `gh api repos/{owner}/{repo}/branches/main/protection` reads classic
+       branch protection. A 404 whose message is "Branch not protected" means
+       only that there is no classic protection. It says nothing about
+       rulesets.
+     - `gh api repos/{owner}/{repo}/branches/main --jq .protected` is a
+       summary, not a substitute for the two reads above.
+     - Conclude `main` is unprotected only when classic protection is absent
+       **and** `rules/branches/main` is empty (`[]`). When a ruleset applies,
+       report what it requires instead: whether pull requests are required,
+       which status checks are required and whether `ci-check` is one, and
+       whether reviews are required.
+     - A 403 from either read, or a 404 from `branches/main/protection` with
+       any other message, means you can't read it: say that and never guess.
    - **Why the tests didn't catch it earlier:** for example, a test that only
      runs on `main`, or a coverage floor that let a drop through.
 
@@ -91,20 +102,58 @@ loop runs with GitHub write access.
     decide whether any of them describes the same underlying failure.
 - **One issue per failure.** Never file more than one issue in a run.
 - **Title:** `CI failing on main: <short cause>`.
-- **Body:** link `CHECK_RUN_URL` and the commit, then give the evidence:
-  quoted log lines and file paths, for example `src/carnival/scores.ts:12`.
-  Name the commit or merged pull request you suspect, and why. After the
-  evidence, add two sections:
-  - `## Root cause: five whys`: the numbered chain, one line per why, each
-    with its evidence.
-  - `## Prevent it`: one item per systemic fix, each saying who can make it:
-    **the factory, from an issue** (code, tests, docs, the CI workflow, or a
-    skill such as `skills/set-up-your-fork`), or **a repository admin, in
-    GitHub settings** (branch protection, rulesets, required checks or
-    reviews). The factory can't change settings.
-- **End with a "Done when"** about getting `main` green, whose last item is
-  `npm run check` passing on `main`. Under it, list the "Prevent it" items as
-  unchecked follow-ups, marked as separate from fixing this failure.
+- **Body:** fill in this template, in this order. Replace `CHECK_RUN_URL` and
+  every `<placeholder>`, and add or drop list items to fit what you found:
+
+  ```markdown
+  [Failed check run](CHECK_RUN_URL) on commit [<short sha>](<commit url>).
+
+  ## Evidence
+
+  - Failing step: <the step from "Name the step">
+  - Files: <file path>:<line>
+
+  > <quoted log line>
+
+  ## Suspected change
+
+  <the commit or merged pull request you suspect, and why>
+
+  ## Root cause: five whys
+
+  1. <why> (<evidence>)
+  2. Because <why> (<evidence>)
+  3. Because <why> (<evidence>)
+  4. Because <why> (<evidence>)
+  5. Because <why> (<evidence>)
+
+  ## Prevent it
+
+  - <systemic fix> (**factory, from an issue**)
+  - <systemic fix> (**repository admin, in GitHub settings**)
+  - <systemic fix>: covered by <link to the existing open issue>
+
+  ## Done when
+
+  - [ ] <a step that gets `main` green>
+  - [ ] `npm run check` passes on `main`.
+
+  Follow-ups, separate from fixing this failure:
+
+  - [ ] <a "Prevent it" item>
+  ```
+
+  - **Five whys:** one why per line, each ending with its evidence. Stop the
+    list early when the next why has no evidence.
+  - **Prevent it:** tag each item with who can make it. The **factory, from
+    an issue** can change code, tests, docs, the CI workflow, or a skill such
+    as `skills/set-up-your-fork`. A **repository admin, in GitHub settings**
+    changes branch protection, rulesets, required checks or reviews. The
+    factory can't change settings.
+  - **Done when:** the items get `main` green, and the last one is
+    `npm run check` passing on `main`. The "Prevent it" items follow as
+    unchecked follow-ups, marked as separate from fixing this failure.
+
 - **Process gaps stay in this issue.** Don't file issues of their own for
   them. If an open issue already covers a process gap, link it under
   "Prevent it" instead of repeating it. A new failure still gets its own
@@ -113,24 +162,3 @@ loop runs with GitHub write access.
 - **No labels.** File the issue with no labels at all.
 - **Can't tell what failed?** Still file one issue: say what you read and what
   you couldn't work out.
-
-## Worked example
-
-Issue #7 came from a failure on commit 5c65a3e. Its chain reads:
-
-1. `ci-check` failed: "uses one shot of water per fire" expected 15 to be 14.
-2. Because `fire()` no longer decrements `state.tank`: commit 5c65a3e deleted
-   the line.
-3. Because 5c65a3e was pushed straight to `main`, with no pull request
-   (`commits/5c65a3e/pulls` is `[]`), so CI only ran after it landed.
-4. Because `main` has no branch protection or ruleset (`protected: false`,
-   and `rules/branches/main` is `[]`), so nothing required a pull request or a
-   passing `ci-check`.
-5. Because setting up a fork (`skills/set-up-your-fork`) never protects
-   `main`.
-
-Prevent it:
-
-- Protect `main` to require a pull request and a passing `ci-check` (a
-  repository admin, in GitHub settings).
-- Add that step to `skills/set-up-your-fork` (the factory, from an issue).
