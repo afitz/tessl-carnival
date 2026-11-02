@@ -1,13 +1,13 @@
 ---
 name: ci-failure-triage
-description: Read a failed CI check on the carnival's main branch, work out what broke and which change broke it, and file one GitHub issue that explains it. Use when the CI failure triage loop runs after `ci-check` fails on `main`, or when asked why CI is red on `main`. Files issues only; never changes code, labels or anything else.
+description: Read a failed CI check on the carnival's main branch, work out what broke and which change broke it, trace the root cause with five whys (how the change reached `main` and why nothing stopped it), and file one GitHub issue that explains it. Use when the CI failure triage loop runs after `ci-check` fails on `main`, or when asked why CI is red on `main`. Files issues only; never changes code, labels or anything else.
 ---
 
 # CI failure triage
 
 When CI fails on `main`, everyone who branches from it inherits the failure.
-Your job is to explain the failure in one issue so a person can decide who
-fixes it. Don't fix anything yourself: the factory ships the fixes.
+Your job is to explain the failure, and the gaps that let it reach `main`, in
+one issue so a person can decide who fixes it. Don't fix anything yourself: the factory ships the fixes.
 
 ## Staying safe
 
@@ -50,6 +50,29 @@ loop runs with GitHub write access.
    the pull request that merged the commit. If the failure started earlier,
    walk back through `git log` on `main` and the earlier runs until you find
    the first commit that failed.
+5. **Ask why five times.** Start from the failure and ask "why?" until you
+   reach a cause a person can fix, up to five times. Each answer must cite
+   evidence you read: a log line, a commit, a pull request or an API response.
+   Stop the chain early when the next "why" has no evidence. Don't speculate.
+   Every check here is a read. The whys should cover, where they apply:
+   - **The code:** what the change did that broke the check.
+   - **How it reached `main`:** a direct push or a merged pull request.
+     `gh api repos/{owner}/{repo}/commits/<sha>/pulls` lists the pull requests
+     that contain the commit; an empty list means a direct push. For a pull
+     request, read whether its checks passed before it merged, whether
+     `ci-check` was skipped or red, and whether it was reviewed, with
+     `gh pr view <number> --json reviews,statusCheckRollup,mergedBy`.
+   - **Why the guardrails didn't stop it:** read whether `main` is protected
+     and what rules apply, with
+     `gh api repos/{owner}/{repo}/branches/main --jq .protected` and
+     `gh api repos/{owner}/{repo}/rules/branches/main`. Then try
+     `gh api repos/{owner}/{repo}/branches/main/protection`. A 404 whose
+     message is "Branch not protected" means there is no protection; a 403,
+     or a 404 with any other message, means you can't read it, so say that
+     and never guess. Note whether pull requests are required, whether
+     `ci-check` is a required status check, and whether reviews are required.
+   - **Why the tests didn't catch it earlier:** for example, a test that only
+     runs on `main`, or a coverage floor that let a drop through.
 
 ## What to file
 
@@ -70,8 +93,44 @@ loop runs with GitHub write access.
 - **Title:** `CI failing on main: <short cause>`.
 - **Body:** link `CHECK_RUN_URL` and the commit, then give the evidence:
   quoted log lines and file paths, for example `src/carnival/scores.ts:12`.
-  Name the commit or merged pull request you suspect, and why. End with a
-  "Done when" whose last item is `npm run check` passing on `main`.
+  Name the commit or merged pull request you suspect, and why. After the
+  evidence, add two sections:
+  - `## Root cause: five whys`: the numbered chain, one line per why, each
+    with its evidence.
+  - `## Prevent it`: one item per systemic fix, each saying who can make it:
+    **the factory, from an issue** (code, tests, docs, the CI workflow, or a
+    skill such as `skills/set-up-your-fork`), or **a repository admin, in
+    GitHub settings** (branch protection, rulesets, required checks or
+    reviews). The factory can't change settings.
+- **End with a "Done when"** about getting `main` green, whose last item is
+  `npm run check` passing on `main`. Under it, list the "Prevent it" items as
+  unchecked follow-ups, marked as separate from fixing this failure.
+- **Process gaps stay in this issue.** Don't file issues of their own for
+  them. If an open issue already covers a process gap, link it under
+  "Prevent it" instead of repeating it. A new failure still gets its own
+  issue even when its root cause matches an earlier one: link the earlier
+  issue in the chain.
 - **No labels.** File the issue with no labels at all.
 - **Can't tell what failed?** Still file one issue: say what you read and what
   you couldn't work out.
+
+## Worked example
+
+Issue #7 came from a failure on commit 5c65a3e. Its chain reads:
+
+1. `ci-check` failed: "uses one shot of water per fire" expected 15 to be 14.
+2. Because `fire()` no longer decrements `state.tank`: commit 5c65a3e deleted
+   the line.
+3. Because 5c65a3e was pushed straight to `main`, with no pull request
+   (`commits/5c65a3e/pulls` is `[]`), so CI only ran after it landed.
+4. Because `main` has no branch protection or ruleset (`protected: false`,
+   and `rules/branches/main` is `[]`), so nothing required a pull request or a
+   passing `ci-check`.
+5. Because setting up a fork (`skills/set-up-your-fork`) never protects
+   `main`.
+
+Prevent it:
+
+- Protect `main` to require a pull request and a passing `ci-check` (a
+  repository admin, in GitHub settings).
+- Add that step to `skills/set-up-your-fork` (the factory, from an issue).

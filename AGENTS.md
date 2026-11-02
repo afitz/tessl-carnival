@@ -147,8 +147,8 @@ You often work on an issue with nobody around to answer questions.
   `tessl.json` runs one as `file:tessl-factory#rule-mining`.
   - `tessl-factory/skills/ci-failure-triage/SKILL.md` runs when CI fails on
     `main`: the `ci-failed-on-main` trigger in `tessl.json` starts it on a
-    failed `ci-check`, and it files one issue explaining the failure, with no
-    label.
+    failed `ci-check`, traces the root cause with five whys, and files one
+    issue explaining the failure and how to prevent it, with no label.
 
 `WORKSHOP.md` starts the workshop this repo was built for, and sends people down
 one of two paths: `workshop/agent.md` or `workshop/browser.md`. Each has a core
